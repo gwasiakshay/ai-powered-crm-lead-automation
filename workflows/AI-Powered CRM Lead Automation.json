@@ -1,0 +1,957 @@
+{
+  "name": "AI-Powered CRM Lead Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "6b82b8f4-06d1-4833-88d2-5464fd455895",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "2d117ca7-d19e-4c05-a365-62743e1c926c",
+      "name": "Lead Intake (Webhook)",
+      "webhookId": "6b82b8f4-06d1-4833-88d2-5464fd455895"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "199cc548-0f0e-40ae-9a1b-760180c13c99",
+              "name": "name",
+              "value": "={{$json.body.name}}",
+              "type": "string"
+            },
+            {
+              "id": "8bf83fbe-4d3a-496e-b4cb-69f008ef8444",
+              "name": "email",
+              "value": "={{$json.body.email}}",
+              "type": "string"
+            },
+            {
+              "id": "36ef922a-ae1a-4394-a68b-516114eef213",
+              "name": "company",
+              "value": "={{$json.body.company}}",
+              "type": "string"
+            },
+            {
+              "id": "3bed5ba2-498b-4aa6-b628-b3673e10a72b",
+              "name": "message",
+              "value": "={{$json.body.message}}",
+              "type": "string"
+            },
+            {
+              "id": "ce604fe6-0cee-41e3-a13f-8fb02b40e48e",
+              "name": "source",
+              "value": "={{$json.body.source}}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        64,
+        -16
+      ],
+      "id": "f38e24ec-0148-4e0a-946f-e324209c8d34",
+      "name": "Normalize Lead Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a lead qualification assistant.\n\nAnalyze the message below and return STRICT JSON only with:\n\n{\n  \"intent\": \"Sales | Support | General\",\n  \"priority\": \"High | Medium | Low\",\n  \"lead_score\": number (1-10),\n  \"confidence\": number (0-1),\n  \"summary\": \"short summary\"\n}\n\nRules:\n- If you are unsure, set confidence below 0.6\n- If confidence < 0.6, intent MUST be \"Review\"\n- Do NOT return any text outside JSON\n\nMessage:\n{{ $json.message }}\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        192,
+        -224
+      ],
+      "id": "746bb513-4254-4ac8-b90a-490d30502e99",
+      "name": "AI Lead Classification"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-3.5-turbo",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-3.5-turbo"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 150,
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        112,
+        224
+      ],
+      "id": "11fd6eb8-20ec-4d40-a148-43bf82e17878",
+      "name": "OpenAI GPT Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "xCFisvyFlgbViAwZ",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let ai = {};\n\n// Safely parse AI response\ntry {\n  ai = JSON.parse($json.text);\n} catch (e) {\n  ai = {};\n}\n\n// Get normalized lead data\nconst lead = $items(\"Normalize Lead Data\")[0].json;\n\nreturn {\n  ...lead,\n\n  // AI outputs\n  intent: ai.intent || \"Review\",\n  priority: ai.priority || \"Low\",\n  lead_score: ai.lead_score ?? 0,\n  confidence: ai.confidence ?? 0.5,\n  summary: ai.summary || \"No summary generated\"\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        0
+      ],
+      "id": "2749a796-fb3f-400a-a2ab-c2f33918ea0c",
+      "name": "AI Response Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "688b39a7-0fdc-440c-83bb-56c18cf0b5ae",
+              "leftValue": "={{$json.intent}}",
+              "rightValue": "Sales",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        -64
+      ],
+      "id": "b3cd47f2-caf7-4c3b-99f9-d3578eef3644",
+      "name": "Route by Intent"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2cda60b4-8662-47b7-8130-7ba93786a3d2",
+              "leftValue": "={{ $json.intent }}",
+              "rightValue": "Support",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        96
+      ],
+      "id": "db0fe0d8-8cf0-4721-9e36-91b9703c155f",
+      "name": "Check Support Intent"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU",
+          "mode": "list",
+          "cachedResultName": "AI-Powered CRM Lead Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 13348034,
+          "mode": "list",
+          "cachedResultName": "Low Priority lead",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit#gid=13348034"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{$json.name}}",
+            "Email": "={{$json.email}}",
+            "Company": "={{$json.email}}",
+            "Message": "={{$json.message}}",
+            "Intent": "={{$json.intent}}",
+            "Lead Score": "={{$json.lead_score}}",
+            "Summary": "={{$json.summary}}",
+            "Timestamp": "={{$now}}",
+            "Follow-Up Needed": "No",
+            "Notes": "Auto-routed to support"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Score",
+              "displayName": "Lead Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Follow-Up Needed",
+              "displayName": "Follow-Up Needed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        960,
+        176
+      ],
+      "id": "0e327a89-9e6e-4fdb-a53b-336451fdc1c1",
+      "name": "Store Low Priority Lead",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HUakYfMsS4UiqTHi",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU",
+          "mode": "list",
+          "cachedResultName": "AI-Powered CRM Lead Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 165796390,
+          "mode": "list",
+          "cachedResultName": "Support",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit#gid=165796390"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{$now}}",
+            "Name": "={{$json.name}}",
+            "Email": "={{$json.email}}",
+            "Message": "={{$json.message}}",
+            "Intent": "={{$json.intent}}",
+            "Priority": "={{$json.priority}}",
+            "Summary": "={{$json.summary}}",
+            "Status": "Open",
+            "Notes": "Auto-routed to support"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1008,
+        32
+      ],
+      "id": "4adf47f7-23e8-4bdc-a0b8-0653f21f1f5e",
+      "name": "Notify Support Team",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HUakYfMsS4UiqTHi",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e9bcbef6-f5fb-4567-9dd0-5b048c49edee",
+              "leftValue": "={{ $json.confidence }}",
+              "rightValue": 0.6,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            },
+            {
+              "id": "4dc5836d-caac-44e3-81fc-25d529dc0707",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        496,
+        -64
+      ],
+      "id": "fd2351d1-2e08-4568-b16b-f64037c5928b",
+      "name": "Check Confidence Level"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU",
+          "mode": "list",
+          "cachedResultName": "AI-Powered CRM Lead Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 612177717,
+          "mode": "list",
+          "cachedResultName": "Manuel Review ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit#gid=612177717"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{$now}}",
+            "Name": "={{$json.name}}",
+            "Email": "={{$json.email}}",
+            "Company": "={{$json.company}}",
+            "Message": "={{$json.message}}",
+            "Intent": "={{$json.intent}}",
+            "Summary": "={{$json.summary}}",
+            "Confidence": "={{$json.confidence}}",
+            "Status": "Needs Review",
+            "Notes": "Low confidence classification"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Confidence",
+              "displayName": "Confidence",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        800,
+        -240
+      ],
+      "id": "688d7a8d-1a15-4fd9-890f-9bbc892c72b0",
+      "name": "Manual Review Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HUakYfMsS4UiqTHi",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU",
+          "mode": "list",
+          "cachedResultName": "AI-Powered CRM Lead Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1EMJKyE8CJEzcUtk2gs_qX_K6_jFRDktvd9d4xUOGuOU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{$now}}",
+            "Name": "={{$json.name}}",
+            "Email": "={{$json.email}}",
+            "Company": "={{$json.company}}",
+            "Source": "={{$json.source}}",
+            "Message": "={{$json.message}}",
+            "Intent": "={{$json.intent}}",
+            "Priority": "={{$json.priority}}",
+            "Lead Score": "={{$json.lead_score}}",
+            "Summary": "={{$json.summary}}",
+            "Status": "New",
+            "Notes": "Auto-generated via AI lead intake workflow"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Timestamp",
+              "displayName": "Timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Intent",
+              "displayName": "Intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Lead Score",
+              "displayName": "Lead Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Summary",
+              "displayName": "Summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        848,
+        -80
+      ],
+      "id": "6bd98d09-fd77-400d-a3ea-cc755ef8090e",
+      "name": "Save Lead to Sales",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HUakYfMsS4UiqTHi",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lead Intake (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Data": {
+      "main": [
+        [
+          {
+            "node": "AI Lead Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI GPT Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Lead Classification",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Lead Classification": {
+      "main": [
+        [
+          {
+            "node": "AI Response Parser",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Response Parser": {
+      "main": [
+        [
+          {
+            "node": "Check Confidence Level",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sales",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Support Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Support Intent": {
+      "main": [
+        [
+          {
+            "node": "Notify Support Team",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Low Priority Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Confidence Level": {
+      "main": [
+        [
+          {
+            "node": "Manual Review Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "ab7012ce-23fa-4e75-8c27-22e42135b62d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "05b54351dc93b0fbc57c8c2740758647288de9a9b3d38c48d418b58110e509a7"
+  },
+  "id": "HmCgnRPp9GKC0rELTBzEh",
+  "tags": []
+}
