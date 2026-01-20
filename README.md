@@ -120,6 +120,15 @@ Real-world CRM logic
 
  Docker deployment
 
+ ## 🚀 How to Run
+
+1. Import workflow JSON into n8n
+2. Configure OpenAI credentials
+3. Connect Google Sheets
+4. Start webhook
+5. Send POST request to webhook URL
+
+Done ✅
  
 👨‍💻 Author
 
